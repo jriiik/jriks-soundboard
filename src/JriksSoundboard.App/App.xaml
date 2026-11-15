@@ -13,6 +13,7 @@
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
             <Style x:Key="WindowBase" TargetType="Window">
+                <Setter Property="Icon" Value="pack://application:,,,/Assets/app.ico" />
                 <Setter Property="Background" Value="{DynamicResource ApplicationBackgroundBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             </Style>
