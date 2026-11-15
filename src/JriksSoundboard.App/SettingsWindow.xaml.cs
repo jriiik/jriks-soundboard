@@ -101,6 +101,8 @@ public partial class SettingsWindow : Window
             AutoCancelSlider.Value = S.AutoCancelSeconds;
             TimeoutCueBox.IsChecked = S.TimeoutCue;
             RestartOnHoverBox.IsChecked = S.RestartTimerOnHover;
+            HoverPreviewBox.IsChecked = S.HoverPreviewEnabled;
+            HoverPreviewSlider.Value = S.HoverPreviewSeconds;
             DeadzoneSlider.Value = S.Deadzone;
             RadiusSlider.Value = S.Radius;
             DwellSlider.Value = S.FolderDwellMs;
@@ -168,6 +170,7 @@ public partial class SettingsWindow : Window
         DeadzoneText.Text = $"{DeadzoneSlider.Value:0}";
         RadiusText.Text = $"{RadiusSlider.Value:0}";
         DwellText.Text = $"{DwellSlider.Value:0} ms";
+        HoverPreviewText.Text = $"{HoverPreviewSlider.Value:0.00} s";
         OverlaySizeText.Text = $"{OverlaySizeSlider.Value:0} px";
         OverlayOpacityText.Text = $"{OverlayOpacitySlider.Value:0}%";
     }
@@ -185,6 +188,8 @@ public partial class SettingsWindow : Window
         AutoCancelRow.IsEnabled = S.AutoCancelEnabled;
         TimeoutCueBox.IsEnabled = S.AutoCancelEnabled;
         RestartOnHoverBox.IsEnabled = S.AutoCancelEnabled;
+        HoverPreviewRow.IsEnabled = S.HoverPreviewEnabled;
+        HoverPreviewRow.Opacity = S.HoverPreviewEnabled ? 1 : 0.5;
 
         OverlayOptions.IsEnabled = S.OverlayMode != OverlayMode.Off;
     }
@@ -356,6 +361,7 @@ public partial class SettingsWindow : Window
         S.AutoCancelEnabled = AutoCancelBox.IsChecked == true;
         S.TimeoutCue = TimeoutCueBox.IsChecked == true;
         S.RestartTimerOnHover = RestartOnHoverBox.IsChecked == true;
+        S.HoverPreviewEnabled = HoverPreviewBox.IsChecked == true;
         runtime.ApplySettings();
         runtime.SaveSettings();
         UpdateEnabledStates();
@@ -380,6 +386,7 @@ public partial class SettingsWindow : Window
         }
         S.Radius = radius;
         S.FolderDwellMs = (int)(Math.Round(DwellSlider.Value / 10) * 10);
+        S.HoverPreviewSeconds = Math.Round(HoverPreviewSlider.Value * 4) / 4;
 
         runtime.ApplySettings();
         UpdateTexts();

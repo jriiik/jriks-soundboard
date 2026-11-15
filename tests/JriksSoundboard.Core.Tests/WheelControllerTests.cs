@@ -300,6 +300,53 @@ public class WheelControllerTests
     }
 
     [Fact]
+    public void Resting_on_a_sound_previews_it_once_and_moving_away_stops_it()
+    {
+        var previews = new List<SlotSnapshot?>();
+        controller.PreviewChanged += previews.Add;
+        controller.Options = WheelOptions.Default with { PreviewAfter = TimeSpan.FromSeconds(2) };
+        controller.ButtonDown(VirtualKeys.Mouse4);
+        controller.MouseMoved(120, 0); // Airhorn
+
+        now = TimeSpan.FromSeconds(1.9);
+        controller.Tick();
+        Assert.Empty(previews);
+        Assert.InRange(controller.GetState().PreviewProgress, 0.9, 1.0);
+
+        now = TimeSpan.FromSeconds(2.0);
+        controller.Tick();
+        Assert.Equal(airhorn, Assert.Single(previews)!.SoundId);
+        Assert.True(controller.GetState().IsPreviewing);
+
+        now = TimeSpan.FromSeconds(4.5); // previewing restarted the 3 s timer, and it plays only once
+        controller.Tick();
+        Assert.True(controller.IsOpen);
+        Assert.Single(previews);
+
+        controller.MouseMoved(-240, 0); // over to Bruh: the preview stops
+        Assert.Equal(2, previews.Count);
+        Assert.Null(previews[1]);
+    }
+
+    [Fact]
+    public void Empty_slices_and_folders_are_never_previewed()
+    {
+        var previews = new List<SlotSnapshot?>();
+        controller.PreviewChanged += previews.Add;
+        controller.Options = WheelOptions.Default with { FolderDwell = TimeSpan.FromSeconds(10), PreviewAfter = TimeSpan.FromSeconds(1) };
+        controller.ButtonDown(VirtualKeys.Mouse4);
+
+        controller.MouseMoved(0, -120); // empty slice (up)
+        now = TimeSpan.FromSeconds(2);
+        controller.Tick();
+        controller.MouseMoved(0, 240);  // folder (down)
+        now = TimeSpan.FromSeconds(4);
+        controller.Tick();
+
+        Assert.Empty(previews);
+    }
+
+    [Fact]
     public void Cancel_key_still_opens_its_own_wheel_when_none_is_open()
     {
         controller.Options = WheelOptions.Default with { CancelKey = VirtualKeys.Mouse5 };

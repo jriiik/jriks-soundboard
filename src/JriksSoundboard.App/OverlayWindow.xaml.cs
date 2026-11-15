@@ -256,9 +256,12 @@ public partial class OverlayWindow : Window
         Wheel.Stick = new System.Windows.Vector(state.StickX / radius, state.StickY / radius);
         Wheel.DeadzoneFraction = state.Deadzone / radius;
         Wheel.TimeRemaining = state.TimeRemainingFraction;
-        Wheel.DwellProgress = state.FolderDwellProgress;
+        // The centre ring fills while you rest: toward opening a folder, or toward a headphone preview.
+        Wheel.DwellProgress = state.FolderDwellProgress > 0 ? state.FolderDwellProgress
+            : state.IsPreviewing ? 0 : state.PreviewProgress;
         Wheel.CenterText = state.FolderName ?? state.Wheel?.Name;
-        ShowName(state.HoveredSlot is int h && h < state.Page.Slots.Count ? Describe(state.Page.Slots[h]) : null);
+        string? name = state.HoveredSlot is int h && h < state.Page.Slots.Count ? Describe(state.Page.Slots[h]) : null;
+        ShowName(name is not null && state.IsPreviewing ? name + "  ·  previewing" : name);
     }
 
     private void PositionAndShow()

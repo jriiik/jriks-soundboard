@@ -83,11 +83,15 @@
                         </Button>
                     </StackPanel>
 
-                    <Grid Grid.Row="2" Margin="0,0,0,10">
-                        <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" />
-                        <TextBlock x:Name="SearchPlaceholder" Text="Search sounds" IsHitTestVisible="False" Margin="12,0,0,0"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </Grid>
+                    <StackPanel Grid.Row="2" Margin="0,0,0,10">
+                        <Grid>
+                            <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" />
+                            <TextBlock x:Name="SearchPlaceholder" Text="Search sounds" IsHitTestVisible="False" Margin="12,0,0,0"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        </Grid>
+                        <CheckBox x:Name="UnusedOnlyBox" Margin="0,8,0,0" Content="Only sounds not on any wheel yet"
+                                  Checked="OnUnusedOnlyChanged" Unchecked="OnUnusedOnlyChanged" />
+                    </StackPanel>
 
                     <Grid Grid.Row="3">
                         <ListBox x:Name="LibraryList" HorizontalContentAlignment="Stretch"

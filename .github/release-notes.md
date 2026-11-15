@@ -13,7 +13,12 @@ Windows may show *"Windows protected your PC"* because the app isn't code-signed
 3. **Steam → Settings → Voice → Voice Input Device:** choose *CABLE Output (VB-Audio Virtual Cable)* and turn *Voice Transmission Threshold* off.
 4. Add sounds, drag them onto the wheel, then in game hold **Mouse 4**, flick toward a sound and release (while holding your push-to-talk).
 
-## What's new in v0.1.2
+## What's new in v0.1.3
+
+- **Preview in game** — with the wheel open, rest on a sound for a moment (2 s by default) and it plays in your headphones only; the game never hears it. It plays once per visit, stops when you move on, and gives the auto-cancel timer its full time back. Settings → Wheel → *Preview while choosing*.
+- **"Only sounds not on any wheel yet"** — a library filter that shows just the sounds you haven't placed. Drop one onto a slice and it leaves the list straight away.
+
+## v0.1.2
 
 - **Full names, always readable** — the overlay shows the full name of the slice you're pointing at above the wheel, and the editor does the same when you hover a slice. Long names (e.g. `what_are_you_talking_about_1_fast_bored`) now shrink and wrap on the slices instead of being cut to a few letters.
 - **Smarter auto-cancel** — the timer restarts every time you point at a different slice, so it only runs out once you stop browsing (can be turned off in Settings → Wheel).

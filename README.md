@@ -73,6 +73,8 @@ Drop audio files or whole folders into the library, then drag sounds onto slices
 - **mp3, wav, ogg, flac, m4a, wma** — decoded into memory, so sounds start instantly.
 - **Save / load your whole setup** as one file — library, wheels, folders, slice positions, hotkeys, settings and (optionally) the audio itself — plus automatic daily backups.
 - **Full names on hover:** the name of the slice you're pointing at is shown above the wheel, so even a 16-slice wheel of long file names stays readable.
+- **Preview in game:** rest on a slice for a moment and the sound plays in your headphones only, so you can check what it is before sending it.
+- **"Not on any wheel yet" filter** in the library, to see which sounds you still have to place.
 - Everything else lives behind one **Settings** button, so the main window stays clean.
 
 ## Anti-cheat safety

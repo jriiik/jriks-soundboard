@@ -173,6 +173,23 @@
                         <TextBlock Style="{StaticResource Hint}" Margin="30,8,0,0"
                                    Text="Want out right away? Set a cancel key on the Hotkeys tab — press it while holding the wheel key." />
 
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Preview while choosing" Margin="0,26,0,10" />
+                        <CheckBox x:Name="HoverPreviewBox" Checked="OnWheelOptionChanged" Unchecked="OnWheelOptionChanged"
+                                  Content="Play a sound in my headphones when I rest on it in the wheel (the game never hears it)" />
+                        <Grid x:Name="HoverPreviewRow" Margin="30,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="64" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Rest for" VerticalAlignment="Center" />
+                            <Slider x:Name="HoverPreviewSlider" Grid.Column="1" Minimum="0.5" Maximum="5" TickFrequency="0.25" IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center" ValueChanged="OnWheelSliderChanged" />
+                            <TextBlock x:Name="HoverPreviewText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}" Margin="30,6,0,0"
+                                   Text="Plays once per visit to a slice and stops when you move on. Releasing the key still plays the sound in game as usual. Needs “Hear sounds yourself” on the Audio tab." />
+
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Flick feel" Margin="0,26,0,10" />
                         <Grid>
                             <Grid.ColumnDefinitions>

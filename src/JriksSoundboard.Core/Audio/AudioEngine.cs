@@ -222,6 +222,15 @@ public sealed class AudioEngine : IDisposable
         }
     }
 
+    /// <summary>Stops a headphone-only preview (game sounds keep playing).</summary>
+    public void StopPreview()
+    {
+        lock (gate)
+        {
+            previewSounds?.RemoveAllMixerInputs();
+        }
+    }
+
     public void StopAllSounds()
     {
         lock (gate)

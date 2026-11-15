@@ -41,7 +41,8 @@ public sealed record WheelOptions(
     double Deadzone,
     double Radius,
     bool RestartTimerOnHover = true,
-    int CancelKey = 0)
+    int CancelKey = 0,
+    TimeSpan? PreviewAfter = null)
 {
     public static readonly WheelOptions Default = new(TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(350), 60, 240);
 }
@@ -58,7 +59,9 @@ public sealed record WheelViewState(
     double Radius,
     int? HoveredSlot,
     double FolderDwellProgress,
-    double? TimeRemainingFraction)
+    double? TimeRemainingFraction,
+    bool IsPreviewing = false,
+    double PreviewProgress = 0)
 {
     public static readonly WheelViewState Closed = new(false, null, null, null, 0, 0, 0, 1, null, 0, null);
 }
@@ -84,6 +87,8 @@ public sealed class WheelController
     private TimeSpan hoverSince;
     private int? hovered;
     private int suppressedKey;
+    private bool previewing; // a headphone preview is playing for the current hover
+    private bool previewed;  // the preview already fired for the current hover (once per visit)
 
     public WheelController(Func<TimeSpan>? clock = null)
     {
@@ -100,6 +105,9 @@ public sealed class WheelController
 
     /// <summary>Wheel closed. The slot is only set for <see cref="WheelCloseReason.SoundChosen"/>.</summary>
     public event Action<WheelSnapshot, WheelCloseReason, SlotSnapshot?>? Closed;
+
+    /// <summary>Start a headphone preview of this slot, or stop the current one (null).</summary>
+    public event Action<SlotSnapshot?>? PreviewChanged;
 
     public BoardSnapshot Board
     {
@@ -209,6 +217,7 @@ public sealed class WheelController
 
     public void MouseMoved(int dx, int dy)
     {
+        PreviewChange? change;
         lock (gate)
         {
             if (wheel is null)
@@ -216,7 +225,11 @@ public sealed class WheelController
                 return;
             }
             selector.AddDelta(dx, dy);
-            UpdateHoverLocked(clock());
+            change = UpdateHoverLocked(clock());
+        }
+        if (change is not null)
+        {
+            PreviewChanged?.Invoke(change.Slot);
         }
     }
 
@@ -224,6 +237,7 @@ public sealed class WheelController
     public void Tick()
     {
         WheelSnapshot? timedOut = null;
+        PreviewChange? change;
         lock (gate)
         {
             if (wheel is null)
@@ -232,7 +246,7 @@ public sealed class WheelController
             }
 
             TimeSpan now = clock();
-            UpdateHoverLocked(now);
+            change = UpdateHoverLocked(now);
 
             if (options.AutoCancelAfter is { } limit && now - timerStartedAt >= limit)
             {
@@ -243,6 +257,10 @@ public sealed class WheelController
             }
         }
 
+        if (change is not null)
+        {
+            PreviewChanged?.Invoke(change.Slot);
+        }
         if (timedOut is not null)
         {
             Closed?.Invoke(timedOut, WheelCloseReason.TimedOut, null);
@@ -292,8 +310,15 @@ public sealed class WheelController
                 ? Math.Clamp(1 - (now - timerStartedAt) / limit, 0, 1)
                 : null;
 
+            double previewProgress = 0;
+            if (hovered is int ph && !previewed && page.Slots[ph].Kind == SlotKind.Sound
+                && options.PreviewAfter is { } after && after > TimeSpan.Zero)
+            {
+                previewProgress = Math.Clamp((now - hoverSince) / after, 0, 1);
+            }
+
             return new WheelViewState(true, wheel, page, folderName, stick.X, stick.Y, stick.Deadzone, stick.Radius,
-                stick.SelectedSlice, dwell, remaining);
+                stick.SelectedSlice, dwell, remaining, previewing, previewProgress);
         }
     }
 
@@ -306,30 +331,58 @@ public sealed class WheelController
         timerStartedAt = clock();
         hoverSince = timerStartedAt;
         hovered = null;
+        previewing = false;
+        previewed = false;
     }
 
-    private void UpdateHoverLocked(TimeSpan now)
+    /// <returns>A preview start/stop to announce once the lock is released, or null.</returns>
+    private PreviewChange? UpdateHoverLocked(TimeSpan now)
     {
         int? current = selector.GetState().SelectedSlice;
         if (current != hovered)
         {
+            bool wasPreviewing = previewing;
             hovered = current;
             hoverSince = now;
+            previewing = false;
+            previewed = false;
             if (current is not null && options.RestartTimerOnHover)
             {
                 timerStartedAt = now; // still browsing: give the full time again
             }
-            return;
+            return wasPreviewing ? PreviewChange.Stop : null;
         }
 
-        // Resting on a folder (top level only) opens it and recentres the stick.
-        if (hovered is int h
-            && folderName is null
-            && page!.Slots[h] is { Kind: SlotKind.Folder, Folder: { } sub } folderSlot
-            && now - hoverSince >= options.FolderDwell)
+        if (hovered is not int h)
         {
-            OpenPageLocked(sub, folderSlot.Label);
+            return null;
         }
+        SlotSnapshot slot = page!.Slots[h];
+
+        // Resting on a folder (top level only) opens it and recentres the stick.
+        if (folderName is null && slot is { Kind: SlotKind.Folder, Folder: { } sub } && now - hoverSince >= options.FolderDwell)
+        {
+            OpenPageLocked(sub, slot.Label);
+            return null;
+        }
+
+        // Resting on a sound plays it in your headphones (once per visit to that slice).
+        if (!previewed && slot.Kind == SlotKind.Sound && options.PreviewAfter is { } after && now - hoverSince >= after)
+        {
+            previewed = true;
+            previewing = true;
+            if (options.RestartTimerOnHover)
+            {
+                timerStartedAt = now; // time to decide after hearing it
+            }
+            return new PreviewChange(slot);
+        }
+        return null;
+    }
+
+    private sealed record PreviewChange(SlotSnapshot? Slot)
+    {
+        public static readonly PreviewChange Stop = new((SlotSnapshot?)null);
     }
 
     private void ResetLocked()
@@ -338,5 +391,7 @@ public sealed class WheelController
         page = null;
         folderName = null;
         hovered = null;
+        previewing = false;
+        previewed = false;
     }
 }

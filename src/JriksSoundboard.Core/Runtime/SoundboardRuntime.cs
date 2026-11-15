@@ -107,6 +107,7 @@ public sealed class SoundboardRuntime : IDisposable
 
         Wheels.Opened += OnWheelOpened;
         Wheels.Closed += OnWheelClosed;
+        Wheels.PreviewChanged += OnPreviewChanged;
         Input.ButtonDown += OnButtonDown;
         Input.ButtonUp += OnButtonUp;
         Input.MouseMoved += Wheels.MouseMoved;
@@ -495,6 +496,19 @@ public sealed class SoundboardRuntime : IDisposable
         Wheels.ButtonUp(vk);
     }
 
+    // Resting on a slice in the open wheel: play it in the headphones only (null = stop).
+    private void OnPreviewChanged(SlotSnapshot? slot)
+    {
+        if (slot?.SoundId is Guid id && snapshot.Sounds.TryGetValue(id, out SoundSnapshot? sound))
+        {
+            PlayInBackground(sound.Name, sound.FilePath, sound.Volume, preview: true);
+        }
+        else
+        {
+            Engine.StopPreview();
+        }
+    }
+
     private void OnWheelOpened(WheelSnapshot wheel)
     {
         tickTimer.Change(TimeSpan.Zero, TickInterval);
@@ -505,6 +519,7 @@ public sealed class SoundboardRuntime : IDisposable
     private void OnWheelClosed(WheelSnapshot wheel, WheelCloseReason reason, SlotSnapshot? slot)
     {
         tickTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        Engine.StopPreview(); // a chosen sound (or a cancel) ends any headphone preview
 
         string? soundName = null;
         switch (reason)

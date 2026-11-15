@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private int? selectedSlot;
     private int? hoveredSlot;
     private SoundItem? selectedSound;
+    private readonly string emptyLibraryHint;
     private SoundItem? dragCandidate;
     private Point dragStart;
     private bool populating;
@@ -47,6 +48,14 @@ public partial class MainWindow : Window
         LibraryList.ItemsSource = runtime.Board.Sounds;
         libraryView = CollectionViewSource.GetDefaultView(runtime.Board.Sounds);
         libraryView.Filter = MatchesSearch;
+        // Re-filter by itself when a sound goes on/off a wheel (so with "not on any wheel yet"
+        // ticked, a sound disappears from the list the moment you drop it onto a slice).
+        if (libraryView is ICollectionViewLiveShaping live && live.CanChangeLiveFiltering)
+        {
+            live.LiveFilteringProperties.Add(nameof(SoundItem.IsOnWheel));
+            live.IsLiveFiltering = true;
+        }
+        emptyLibraryHint = LibraryEmptyHint.Text;
         runtime.Board.Sounds.CollectionChanged += (_, _) => UpdateLibraryHeader();
 
         WheelTabs.ItemsSource = runtime.Board.Wheels;
@@ -220,7 +229,15 @@ public partial class MainWindow : Window
     private bool MatchesSearch(object item)
     {
         string query = SearchBox?.Text.Trim() ?? string.Empty;
-        return item is SoundItem sound && (query.Length == 0 || sound.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+        return item is SoundItem sound
+               && (query.Length == 0 || sound.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+               && (UnusedOnlyBox?.IsChecked != true || !sound.IsOnWheel);
+    }
+
+    private void OnUnusedOnlyChanged(object sender, RoutedEventArgs e)
+    {
+        libraryView?.Refresh();
+        UpdateLibraryHeader();
     }
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
@@ -232,8 +249,12 @@ public partial class MainWindow : Window
     private void UpdateLibraryHeader()
     {
         int count = runtime.Board.Sounds.Count;
-        LibraryCount.Text = count == 1 ? "1 sound" : $"{count} sounds";
-        LibraryEmptyHint.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        int unused = runtime.Board.Sounds.Count(s => !s.IsOnWheel);
+        bool unusedOnly = UnusedOnlyBox.IsChecked == true;
+        LibraryCount.Text = unusedOnly ? $"{unused} of {count} not on a wheel"
+            : count == 1 ? "1 sound" : $"{count} sounds";
+        LibraryEmptyHint.Text = count == 0 ? emptyLibraryHint : "Every sound is already on a wheel.";
+        LibraryEmptyHint.Visibility = count == 0 || (unusedOnly && unused == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void OnAddSounds(object sender, RoutedEventArgs e)
@@ -721,6 +742,7 @@ public partial class MainWindow : Window
             populating = false;
         }
         UpdateSliceName();
+        UpdateLibraryHeader(); // "x of y not on a wheel" changes as slots are filled/cleared
     }
 
     /// <summary>Full name of the slice under the mouse (or the selected one) above the wheel.</summary>

@@ -45,6 +45,8 @@ public sealed class AppSettings
     public double AutoCancelSeconds { get; set; } = 3.0;
     public bool TimeoutCue { get; set; } = true;
     public bool RestartTimerOnHover { get; set; } = true;
+    public bool HoverPreviewEnabled { get; set; } = true;
+    public double HoverPreviewSeconds { get; set; } = 2.0;
     public int FolderDwellMs { get; set; } = 350;
     public double Deadzone { get; set; } = 60;
     public double Radius { get; set; } = 240;
@@ -79,7 +81,8 @@ public sealed class AppSettings
         Deadzone,
         Math.Max(Radius, Deadzone + 1),
         RestartTimerOnHover,
-        CancelKey);
+        CancelKey,
+        HoverPreviewEnabled ? TimeSpan.FromSeconds(Math.Max(0.25, HoverPreviewSeconds)) : null);
 }
 
 public static class SettingsStore
