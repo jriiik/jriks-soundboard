@@ -11,6 +11,8 @@ No list of hotkeys to memorize. Just muscle memory.
 
 **Windows** · tested in **Counter-Strike 2** · no injection, no game hooks
 
+**[Download for Windows](https://github.com/jriiik/jriks-soundboard/releases/latest)**
+
 </div>
 
 ---
@@ -21,11 +23,11 @@ Most soundboards bind every sound to its own hotkey. That's fine for five sounds
 
 Jrik's Soundboard puts your sounds on a **radial wheel**:
 
-- 🎯 **One key, many sounds.** Each wheel holds 4–16 sounds, picked by the *direction* you flick.
-- 🗂️ **Folders inside the wheel.** Any slice can open a second wheel — up to **256 sounds on a single key**.
-- 🧠 **Muscle memory instead of memorization.** Sounds never move, so after a few games your hand just knows that *Airhorn* is "flick right".
-- 🖱️ **Works while the game locks your cursor.** The wheel reads raw mouse movement like a joystick, so it works mid-match.
-- ⌨️ **As many wheels as you want**, each on its own key — mouse side buttons are perfect.
+- **One key, many sounds.** Each wheel holds 4–16 sounds, picked by the *direction* you flick.
+- **Folders inside the wheel.** Any slice can open a second wheel — up to **256 sounds on a single key**.
+- **Muscle memory instead of memorization.** Sounds never move, so after a few games your hand just knows that *Airhorn* is "flick right".
+- **Works while the game locks your cursor.** The wheel reads raw mouse movement like a joystick, so it works mid-match.
+- **As many wheels as you want**, each on its own key — mouse side buttons are perfect.
 
 ## How it works
 
@@ -69,7 +71,7 @@ Drop audio files or whole folders into the library, then drag sounds onto slices
 - **Microphone modes:** use the game's own push-to-talk (default), push-to-talk handled by the app, voice activation, or mic off.
 - **Preview in your headphones only**, per-sound volume, and optional **loudness levelling** so every clip sounds about equally loud.
 - **mp3, wav, ogg, flac, m4a, wma** — decoded into memory, so sounds start instantly.
-- Everything else lives behind one **⚙ Settings** button, so the main window stays clean.
+- Everything else lives behind one **Settings** button, so the main window stays clean.
 
 ## Anti-cheat safety
 
@@ -85,13 +87,19 @@ Hotkeys are observed with Windows **Raw Input** (`RIDEV_INPUTSINK`), which is re
 
 ## Getting started
 
-**Requirements:** Windows 10 or 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download), and [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (free; a separate product with its own license, not included here — reboot after installing).
+You need Windows 10 or 11 (64-bit) and [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) — free, a separate product with its own license, not included here. Reboot after installing it.
+
+**Option 1 — download (easiest):** grab **JriksSoundboard.exe** from the [latest release](https://github.com/jriiik/jriks-soundboard/releases/latest) and run it. It's a single file: no installer, no .NET install needed. Windows may warn that the app isn't signed yet — click **More info → Run anyway**.
+
+**Option 2 — build from source** (needs the [.NET 10 SDK](https://dotnet.microsoft.com/download)):
 
 ```bash
 git clone https://github.com/jriiik/jriks-soundboard.git
 cd jriks-soundboard
 dotnet run --project src/JriksSoundboard.App
 ```
+
+Then set it up:
 
 1. **Steam → Settings → Voice → Voice Input Device:** choose *CABLE Output (VB-Audio Virtual Cable)* and turn *Voice Transmission Threshold* off.
 2. In the app, click **Add sounds…** (or drag files in) and drag them onto the wheel's slices.
