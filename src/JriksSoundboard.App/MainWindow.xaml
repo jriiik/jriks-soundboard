@@ -236,9 +236,12 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
+                            <TextBlock x:Name="SliceNameText" Grid.Row="1" FontSize="16" FontWeight="SemiBold" TextAlignment="Center"
+                                       TextWrapping="Wrap" Margin="0,10,0,0" MinHeight="22" />
                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                 <Button x:Name="BackButton" Click="OnFolderBack" Margin="0,0,10,0" Visibility="Collapsed">
                                     <StackPanel Orientation="Horizontal">
@@ -248,10 +251,10 @@
                                 </Button>
                                 <TextBlock x:Name="BreadcrumbText" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Viewbox Grid.Row="1" Stretch="Uniform" StretchDirection="Both" Margin="0,8">
+                            <Viewbox Grid.Row="2" Stretch="Uniform" StretchDirection="Both" Margin="0,4,0,8">
                                 <local:WheelView x:Name="EditorWheel" Width="480" Height="480" />
                             </Viewbox>
-                            <TextBlock Grid.Row="2" Style="{StaticResource Hint}" TextAlignment="Center" Margin="0"
+                            <TextBlock Grid.Row="3" Style="{StaticResource Hint}" TextAlignment="Center" Margin="0"
                                        Text="Drag a sound from the library onto a slice · drag a slice onto another to swap · double-click a sound to drop it into the selected slice" />
                         </Grid>
 

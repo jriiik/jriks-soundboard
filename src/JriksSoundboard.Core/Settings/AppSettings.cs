@@ -44,6 +44,7 @@ public sealed class AppSettings
     public bool AutoCancelEnabled { get; set; } = true;
     public double AutoCancelSeconds { get; set; } = 3.0;
     public bool TimeoutCue { get; set; } = true;
+    public bool RestartTimerOnHover { get; set; } = true;
     public int FolderDwellMs { get; set; } = 350;
     public double Deadzone { get; set; } = 60;
     public double Radius { get; set; } = 240;
@@ -57,11 +58,28 @@ public sealed class AppSettings
     // ── Hotkeys (wheel hotkeys live on each wheel in board.json) ──
     public int StopKey { get; set; } = VirtualKeys.None;
 
+    /// <summary>Closes an open wheel without playing anything. May equal another wheel's hotkey.</summary>
+    public int CancelKey { get; set; } = VirtualKeys.None;
+
+    /// <summary>Copies every setting from <paramref name="other"/> (used when loading a backup).</summary>
+    public void CopyFrom(AppSettings other)
+    {
+        foreach (System.Reflection.PropertyInfo property in typeof(AppSettings).GetProperties())
+        {
+            if (property.CanRead && property.CanWrite)
+            {
+                property.SetValue(this, property.GetValue(other));
+            }
+        }
+    }
+
     public WheelOptions ToWheelOptions() => new(
         AutoCancelEnabled ? TimeSpan.FromSeconds(Math.Max(0.5, AutoCancelSeconds)) : null,
         TimeSpan.FromMilliseconds(Math.Max(0, FolderDwellMs)),
         Deadzone,
-        Math.Max(Radius, Deadzone + 1));
+        Math.Max(Radius, Deadzone + 1),
+        RestartTimerOnHover,
+        CancelKey);
 }
 
 public static class SettingsStore

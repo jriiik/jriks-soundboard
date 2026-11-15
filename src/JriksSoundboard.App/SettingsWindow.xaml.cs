@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using JriksSoundboard.Core.Audio;
 using JriksSoundboard.Core.Board;
 using JriksSoundboard.Core.Input;
@@ -55,6 +57,9 @@ public partial class SettingsWindow : Window
         };
     }
 
+    /// <summary>Raised after a backup replaced the library, wheels and settings.</summary>
+    public event Action? ConfigurationLoaded;
+
     private AppSettings S => runtime.Settings;
 
     public void SelectTab(string header) =>
@@ -95,6 +100,7 @@ public partial class SettingsWindow : Window
             AutoCancelBox.IsChecked = S.AutoCancelEnabled;
             AutoCancelSlider.Value = S.AutoCancelSeconds;
             TimeoutCueBox.IsChecked = S.TimeoutCue;
+            RestartOnHoverBox.IsChecked = S.RestartTimerOnHover;
             DeadzoneSlider.Value = S.Deadzone;
             RadiusSlider.Value = S.Radius;
             DwellSlider.Value = S.FolderDwellMs;
@@ -178,6 +184,7 @@ public partial class SettingsWindow : Window
 
         AutoCancelRow.IsEnabled = S.AutoCancelEnabled;
         TimeoutCueBox.IsEnabled = S.AutoCancelEnabled;
+        RestartOnHoverBox.IsEnabled = S.AutoCancelEnabled;
 
         OverlayOptions.IsEnabled = S.OverlayMode != OverlayMode.Off;
     }
@@ -185,6 +192,7 @@ public partial class SettingsWindow : Window
     private void UpdateKeyTexts()
     {
         StopKeyText.Text = S.StopKey == VirtualKeys.None ? "not set" : VirtualKeys.GetName(S.StopKey);
+        CancelKeyText.Text = S.CancelKey == VirtualKeys.None ? "not set" : VirtualKeys.GetName(S.CancelKey);
         PttKeyText.Text = S.PushToTalkKey == VirtualKeys.None ? "not set" : VirtualKeys.GetName(S.PushToTalkKey);
     }
 
@@ -315,7 +323,7 @@ public partial class SettingsWindow : Window
         {
             return;
         }
-        if (runtime.FindHotkeyConflict(vk, exceptPushToTalk: true) is { } conflict)
+        if (runtime.FindHotkeyConflict(vk, HotkeyRole.PushToTalk) is { } conflict)
         {
             MessageBox.Show(this, conflict, "Key already in use", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -347,6 +355,7 @@ public partial class SettingsWindow : Window
         }
         S.AutoCancelEnabled = AutoCancelBox.IsChecked == true;
         S.TimeoutCue = TimeoutCueBox.IsChecked == true;
+        S.RestartTimerOnHover = RestartOnHoverBox.IsChecked == true;
         runtime.ApplySettings();
         runtime.SaveSettings();
         UpdateEnabledStates();
@@ -439,7 +448,7 @@ public partial class SettingsWindow : Window
         {
             return;
         }
-        if (runtime.FindHotkeyConflict(vk, exceptWheel: wheel.Id) is { } conflict)
+        if (runtime.FindHotkeyConflict(vk, HotkeyRole.Wheel, wheel.Id) is { } conflict)
         {
             MessageBox.Show(this, conflict, "Key already in use", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -455,7 +464,7 @@ public partial class SettingsWindow : Window
         {
             return;
         }
-        if (runtime.FindHotkeyConflict(vk, exceptStopKey: true) is { } conflict)
+        if (runtime.FindHotkeyConflict(vk, HotkeyRole.StopAll) is { } conflict)
         {
             MessageBox.Show(this, conflict, "Key already in use", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -470,6 +479,139 @@ public partial class SettingsWindow : Window
         S.StopKey = VirtualKeys.None;
         runtime.SaveSettings();
         UpdateKeyTexts();
+    }
+
+    private async void OnChangeCancelKey(object sender, RoutedEventArgs e)
+    {
+        int? key = await KeyCaptureWindow.CaptureAsync(this, runtime, "Press the key or mouse button that should close an open wheel without playing anything.");
+        if (key is not int vk)
+        {
+            return;
+        }
+        if (runtime.FindHotkeyConflict(vk, HotkeyRole.CancelWheel) is { } conflict)
+        {
+            MessageBox.Show(this, conflict, "Key already in use", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        S.CancelKey = vk;
+        runtime.ApplySettings();
+        runtime.SaveSettings();
+        UpdateKeyTexts();
+    }
+
+    private void OnClearCancelKey(object sender, RoutedEventArgs e)
+    {
+        S.CancelKey = VirtualKeys.None;
+        runtime.ApplySettings();
+        runtime.SaveSettings();
+        UpdateKeyTexts();
+    }
+
+    // ───────────────────────── backup ─────────────────────────
+
+    private void OnSaveConfiguration(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Save configuration",
+            Filter = "Soundboard backup (*.zip)|*.zip",
+            DefaultExt = ".zip",
+            AddExtension = true,
+            FileName = $"Jrik's Soundboard backup {DateTime.Now:yyyy-MM-dd}.zip",
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            BackupManifest saved = ConfigBackup.Save(dialog.FileName, S, runtime.Board, IncludeAudioBox.IsChecked == true, runtime.AppVersion);
+            double megabytes = new FileInfo(dialog.FileName).Length / (1024.0 * 1024.0);
+            BackupStatusText.Text = $"✓ Saved {saved.SoundCount} sound(s) and {saved.WheelCount} wheel(s)"
+                                    + (saved.IncludesAudio ? $" with {saved.AudioFiles} audio file(s)" : string.Empty)
+                                    + $" ({megabytes:0.0} MB).";
+            BackupStatusText.Foreground = Theme("SystemFillColorSuccessBrush");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Couldn't save the configuration:\n{ex.Message}", "Save configuration", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    private void OnLoadConfiguration(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Load configuration",
+            Filter = "Soundboard backup (*.zip)|*.zip|All files|*.*",
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        BackupManifest manifest;
+        try
+        {
+            manifest = ConfigBackup.ReadManifest(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Load configuration", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        string summary = $"{manifest.SoundCount} sound(s), {manifest.WheelCount} wheel(s)"
+                         + (manifest.IncludesAudio ? ", audio files included" : ", without audio files");
+        if (MessageBox.Show(this,
+                $"Replace your current library, wheels and settings with this backup?\n\nSaved {manifest.CreatedUtc.ToLocalTime():g}: {summary}.\n\nYour current setup is saved as an automatic backup first, so you can always go back.",
+                "Load configuration", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            runtime.CreateSafetyBackup("before-load");
+            LoadedBackup loaded = ConfigBackup.Load(dialog.FileName, runtime.RestoredAudioFolder);
+            runtime.ReplaceConfiguration(loaded.Settings, loaded.Board);
+            LoadValues();
+            ConfigurationLoaded?.Invoke();
+
+            string message = $"✓ Loaded {loaded.Board.Sounds.Count} sound(s) and {loaded.Board.Wheels.Count} wheel(s).";
+            if (loaded.SoundsRestoredFromBackup > 0)
+            {
+                message += $" {loaded.SoundsRestoredFromBackup} audio file(s) were restored from the backup into “{runtime.RestoredAudioFolder}”.";
+            }
+            if (loaded.MissingSounds.Count > 0)
+            {
+                message += $"\n⚠ {loaded.MissingSounds.Count} sound file(s) couldn't be found: {string.Join(", ", loaded.MissingSounds.Take(8))}"
+                           + (loaded.MissingSounds.Count > 8 ? "…" : string.Empty);
+            }
+            BackupStatusText.Text = message;
+            BackupStatusText.Foreground = Theme(loaded.MissingSounds.Count > 0 ? "SystemFillColorCautionBrush" : "SystemFillColorSuccessBrush");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Couldn't load the configuration:\n{ex.Message}", "Load configuration", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    private void OnOpenBackupsFolder(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(runtime.BackupFolder);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{runtime.BackupFolder}\"") { UseShellExecute = true });
     }
 
     // ───────────────────────── diagnostics ─────────────────────────

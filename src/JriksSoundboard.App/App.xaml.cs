@@ -44,6 +44,8 @@ public partial class App : Application
         runtime = new SoundboardRuntime(settings, board, AppPaths.SettingsFile, AppPaths.BoardFile)
         {
             PersistenceEnabled = snapshotDir is null,
+            AppVersion = System.Reflection.CustomAttributeExtensions
+                .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(App).Assembly)?.InformationalVersion,
         };
         runtime.Log += log.Add;
 

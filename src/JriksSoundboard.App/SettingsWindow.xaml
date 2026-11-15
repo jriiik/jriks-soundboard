@@ -168,6 +168,10 @@
                                    Text="Hold the wheel key without choosing and it closes on its own — releasing afterwards plays nothing. A ring around the wheel shows the time left; opening a folder restarts it." />
                         <CheckBox x:Name="TimeoutCueBox" Margin="30,10,0,0" Checked="OnWheelOptionChanged" Unchecked="OnWheelOptionChanged"
                                   Content="Play a soft cue in my headphones when it cancels (the game never hears it)" />
+                        <CheckBox x:Name="RestartOnHoverBox" Margin="30,10,0,0" Checked="OnWheelOptionChanged" Unchecked="OnWheelOptionChanged"
+                                  Content="Restart the timer whenever I point at a different slice (it only runs out once I stop browsing)" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="30,8,0,0"
+                                   Text="Want out right away? Set a cancel key on the Hotkeys tab — press it while holding the wheel key." />
 
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Flick feel" Margin="0,26,0,10" />
                         <Grid>
@@ -285,13 +289,51 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <TextBlock Text="Stop all sounds" VerticalAlignment="Center" />
                             <TextBlock x:Name="StopKeyText" Grid.Column="1" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Button Grid.Column="2" Content="Change…" Click="OnChangeStopKey" Margin="0,0,8,0" />
                             <Button Grid.Column="3" Content="Clear" Click="OnClearStopKey" />
+
+                            <TextBlock Grid.Row="1" Text="Cancel the open wheel" VerticalAlignment="Center" Margin="0,10,0,0" />
+                            <TextBlock x:Name="CancelKeyText" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,10,0,0" />
+                            <Button Grid.Row="1" Grid.Column="2" Content="Change…" Click="OnChangeCancelKey" Margin="0,10,8,0" />
+                            <Button Grid.Row="1" Grid.Column="3" Content="Clear" Click="OnClearCancelKey" Margin="0,10,0,0" />
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Style="{StaticResource Hint}"
+                                       Text="Press it while holding a wheel key to close the wheel at once without playing anything. It may be another wheel's key (e.g. Mouse 5): that only opens its wheel when no wheel is open." />
                         </Grid>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,12,0,0"
                                    Text="The app push-to-talk key (if you use that mode) is set on the Microphone tab." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Backup ───────── -->
+            <TabItem Header="Backup">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Save your setup" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0"
+                                   Text="Saves your library, every wheel and folder (with each sound's position), your hotkeys and all settings into one .zip file." />
+                        <CheckBox x:Name="IncludeAudioBox" IsChecked="True" Margin="0,12,0,0"
+                                  Content="Include the audio files (restores even if the originals move, or on another PC)" />
+                        <Button Content="Save configuration…" Click="OnSaveConfiguration" HorizontalAlignment="Left" Margin="0,12,0,0" />
+
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Load a setup" Margin="0,28,0,10" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0"
+                                   Text="Replaces your current library, wheels and settings with a saved one. Your current setup is backed up automatically first, so you can always go back." />
+                        <Button Content="Load configuration…" Click="OnLoadConfiguration" HorizontalAlignment="Left" Margin="0,12,0,0" />
+
+                        <TextBlock x:Name="BackupStatusText" Style="{StaticResource Hint}" Margin="0,16,0,0" />
+
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Automatic backups" Margin="0,28,0,10" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0"
+                                   Text="The app also keeps the last 10 copies of your setup (without the audio files): one a day, plus one before every load. Open one with “Load configuration…”." />
+                        <Button Content="Open backups folder" Click="OnOpenBackupsFolder" HorizontalAlignment="Left" Margin="0,12,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

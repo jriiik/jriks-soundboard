@@ -23,7 +23,7 @@ internal static class SnapshotRunner
             SaveWindow(main, Path.Combine(folder, "main.png"));
 
             SettingsWindow settings = main.OpenSettings();
-            foreach (string tab in new[] { "Audio", "Microphone", "Wheel", "Overlay", "Hotkeys", "Diagnostics" })
+            foreach (string tab in new[] { "Audio", "Microphone", "Wheel", "Overlay", "Hotkeys", "Backup", "Diagnostics" })
             {
                 settings.SelectTab(tab);
                 await Task.Delay(150);
@@ -38,6 +38,9 @@ internal static class SnapshotRunner
 
             // README showcase: animation frames + stills of the wheel in use.
             new ShowcaseRenderer(main.Runtime.Wheels.Board.Wheels[0]).Render(Path.Combine(folder, "showcase"));
+
+            // Label stress test: a 16-slice wheel full of long file-style names.
+            SaveElement(LabelStressWheel(), Path.Combine(folder, "labels-16.png"), new SolidColorBrush(Color.FromRgb(0x20, 0x20, 0x20)));
         }
         catch (Exception ex)
         {
@@ -47,6 +50,30 @@ internal static class SnapshotRunner
         {
             Application.Current.Shutdown();
         }
+    }
+
+    private static FrameworkElement LabelStressWheel()
+    {
+        string[] names =
+        [
+            "whatdoyoumean_1_fast_bored", "what_are_you_talking_about_1_fast_bored", "im_muting_you", "shut_up",
+            "never", "nope", "Emotional damage", "Why are you running", "It's free real estate",
+            "Directed by Robert B. Weide", "Mission failed, we'll get em next time", "Rush B no stop",
+            "To be continued", "Windows XP shutdown", "bruh", "Vine boom",
+        ];
+        var wheel = new WheelView
+        {
+            Width = 480,
+            Height = 480,
+            CenterText = "Sent 1",
+            HighlightedSlot = 0,
+            Slots = names.Select(n => new WheelSlotVisual(n, JriksSoundboard.Core.Board.SlotKind.Sound)).ToList(),
+        };
+        var size = new Size(480, 480);
+        wheel.Measure(size);
+        wheel.Arrange(new Rect(size));
+        wheel.UpdateLayout();
+        return wheel;
     }
 
     private static Task Idle(Window window) =>

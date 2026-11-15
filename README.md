@@ -55,7 +55,7 @@ Group your sounds however you like — *Reactions*, *Callouts*, *Music*… A fol
 <table>
 <tr>
 <td width="260"><img src="docs/images/auto-cancel.png" width="240" alt="Wheel with an almost empty time ring around it"></td>
-<td>Release in the centre to cancel — or just keep holding. The ring around the wheel shows the time left; when it runs out, the wheel cancels itself and plays a soft cue that <b>only you</b> hear, so you never have to look. Three seconds by default, adjustable, or off.</td>
+<td>Release in the centre, press your <b>cancel key</b> (e.g. Mouse 5) — or just stop moving. The ring around the wheel shows the time left and refills whenever you point at another slice; when it runs out, the wheel cancels itself and plays a soft cue that <b>only you</b> hear, so you never have to look. Three seconds by default, adjustable, or off.</td>
 </tr>
 </table>
 
@@ -71,6 +71,8 @@ Drop audio files or whole folders into the library, then drag sounds onto slices
 - **Microphone modes:** use the game's own push-to-talk (default), push-to-talk handled by the app, voice activation, or mic off.
 - **Preview in your headphones only**, per-sound volume, and optional **loudness levelling** so every clip sounds about equally loud.
 - **mp3, wav, ogg, flac, m4a, wma** — decoded into memory, so sounds start instantly.
+- **Save / load your whole setup** as one file — library, wheels, folders, slice positions, hotkeys, settings and (optionally) the audio itself — plus automatic daily backups.
+- **Full names on hover:** the name of the slice you're pointing at is shown above the wheel, so even a 16-slice wheel of long file names stays readable.
 - Everything else lives behind one **Settings** button, so the main window stays clean.
 
 ## Anti-cheat safety

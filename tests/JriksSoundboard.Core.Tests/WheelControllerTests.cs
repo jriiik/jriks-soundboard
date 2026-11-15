@@ -235,4 +235,77 @@ public class WheelControllerTests
 
         Assert.Equal("Callouts", opened?.Name);
     }
+
+    [Fact]
+    public void Pointing_at_a_new_slice_restarts_the_auto_cancel_timer()
+    {
+        controller.ButtonDown(VirtualKeys.Mouse4);
+        now = TimeSpan.FromSeconds(2.0);
+        controller.MouseMoved(120, 0); // point at "right": the full 3 s start again here
+        controller.Tick();
+
+        now = TimeSpan.FromSeconds(4.5);
+        controller.Tick();
+        Assert.True(controller.IsOpen);
+        Assert.Equal(0.5 / 3, controller.GetState().TimeRemainingFraction!.Value, precision: 3);
+
+        now = TimeSpan.FromSeconds(5.1);
+        controller.Tick();
+        Assert.False(controller.IsOpen);
+        Assert.Equal(WheelCloseReason.TimedOut, Assert.Single(closes).Reason);
+    }
+
+    [Fact]
+    public void Moving_back_to_the_centre_does_not_restart_the_timer()
+    {
+        controller.ButtonDown(VirtualKeys.Mouse4);
+        now = TimeSpan.FromSeconds(1.0);
+        controller.MouseMoved(120, 0);  // restart at 1.0 s
+        now = TimeSpan.FromSeconds(2.0);
+        controller.MouseMoved(-120, 0); // back to the centre: not a slice, no restart
+
+        now = TimeSpan.FromSeconds(4.1);
+        controller.Tick();
+
+        Assert.False(controller.IsOpen);
+    }
+
+    [Fact]
+    public void Restarting_on_hover_can_be_turned_off()
+    {
+        controller.Options = WheelOptions.Default with { RestartTimerOnHover = false };
+        controller.ButtonDown(VirtualKeys.Mouse4);
+        now = TimeSpan.FromSeconds(2.0);
+        controller.MouseMoved(120, 0);
+
+        now = TimeSpan.FromSeconds(3.1);
+        controller.Tick();
+
+        Assert.False(controller.IsOpen);
+    }
+
+    [Fact]
+    public void Cancel_key_closes_the_wheel_immediately_and_plays_nothing()
+    {
+        controller.Options = WheelOptions.Default with { CancelKey = VirtualKeys.Mouse5 };
+        controller.ButtonDown(VirtualKeys.Mouse4);
+        controller.MouseMoved(120, 0); // pointing at Airhorn
+
+        Assert.True(controller.ButtonDown(VirtualKeys.Mouse5));
+        Assert.False(controller.IsOpen);
+        controller.ButtonUp(VirtualKeys.Mouse5);
+        controller.ButtonUp(VirtualKeys.Mouse4); // released afterwards: nothing plays
+
+        Assert.Equal(WheelCloseReason.CancelKeyPressed, Assert.Single(closes).Reason);
+    }
+
+    [Fact]
+    public void Cancel_key_still_opens_its_own_wheel_when_none_is_open()
+    {
+        controller.Options = WheelOptions.Default with { CancelKey = VirtualKeys.Mouse5 };
+
+        controller.ButtonDown(VirtualKeys.Mouse5); // Mouse 5 is also the "Callouts" hotkey
+
+        Assert.Equal("Callouts", controller.GetState().Wheel!.Name);
+    }
 }

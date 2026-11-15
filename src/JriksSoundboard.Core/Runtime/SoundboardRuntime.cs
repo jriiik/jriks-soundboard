@@ -6,6 +6,15 @@ using JriksSoundboard.Core.Wheel;
 
 namespace JriksSoundboard.Core.Runtime;
 
+/// <summary>What a hotkey is being bound for (decides which other keys it may share).</summary>
+public enum HotkeyRole
+{
+    Wheel,
+    StopAll,
+    PushToTalk,
+    CancelWheel,
+}
+
 /// <summary>
 /// Wires everything together: passive hotkey listening → wheel → sound cache → audio engine.
 /// The UI owns the editable <see cref="SoundBoard"/> and <see cref="AppSettings"/> and calls
@@ -63,6 +72,15 @@ public sealed class SoundboardRuntime : IDisposable
     /// <summary>Display name of the last sound sent to the game (library names can differ from file names).</summary>
     public string? LastPlayedName { get; private set; }
 
+    /// <summary>Recorded in backups so a future version knows what made them.</summary>
+    public string? AppVersion { get; init; }
+
+    /// <summary>Where automatic safety backups go (next to board.json).</summary>
+    public string BackupFolder => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(boardPath))!, "backups");
+
+    /// <summary>Where audio restored from a loaded backup is extracted.</summary>
+    public string RestoredAudioFolder => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(boardPath))!, "Restored sounds");
+
     /// <summary>Key/button presses seen while another app (the game) had focus — proves background input works.</summary>
     public int BackgroundInputCount => Volatile.Read(ref backgroundInputs);
 
@@ -108,6 +126,71 @@ public sealed class SoundboardRuntime : IDisposable
             InputError = ex.Message;
             RaiseLog("✗ Hotkey listener failed: " + ex.Message);
         }
+
+        AutomaticBackupIfDue();
+    }
+
+    // ───────────────────────── backups ─────────────────────────
+
+    /// <summary>Once a day, keep a safety copy of the setup (without audio).</summary>
+    private void AutomaticBackupIfDue()
+    {
+        if (!PersistenceEnabled || (Board.Sounds.Count == 0 && Board.Wheels.All(w => w.Root.Slots.All(s => s.IsEmpty))))
+        {
+            return;
+        }
+        try
+        {
+            FileInfo? newest = ConfigBackup.AutomaticBackups(BackupFolder).FirstOrDefault();
+            if (newest is null || DateTime.UtcNow - newest.LastWriteTimeUtc > TimeSpan.FromHours(20))
+            {
+                ConfigBackup.SaveAutomatic(BackupFolder, Settings, Board, "daily", appVersion: AppVersion);
+                RaiseLog("Saved the daily automatic backup");
+            }
+        }
+        catch (Exception ex)
+        {
+            RaiseLog("⚠ Automatic backup failed: " + ex.Message);
+        }
+    }
+
+    /// <summary>Saves a safety copy of the current setup right now (e.g. before loading another one). Throws on failure.</summary>
+    public string? CreateSafetyBackup(string reason) =>
+        PersistenceEnabled ? ConfigBackup.SaveAutomatic(BackupFolder, Settings, Board, reason, appVersion: AppVersion) : null;
+
+    /// <summary>
+    /// Replaces the library, wheels and settings with a loaded backup (UI thread). The same
+    /// objects are kept and refilled, so everything bound to them updates in place.
+    /// </summary>
+    public void ReplaceConfiguration(AppSettings settings, SoundBoard board)
+    {
+        Wheels.Cancel();
+        Settings.CopyFrom(settings);
+
+        Board.Sounds.Clear();
+        foreach (SoundItem sound in board.Sounds)
+        {
+            Board.Sounds.Add(sound);
+        }
+        Board.Wheels.Clear();
+        foreach (WheelDefinition wheel in board.Wheels)
+        {
+            Board.Wheels.Add(wheel);
+        }
+        if (Board.Wheels.Count == 0)
+        {
+            Board.Wheels.Add(new WheelDefinition { Name = "Wheel 1", Hotkey = VirtualKeys.Mouse4 });
+        }
+        Board.Normalize();
+
+        SaveSettings();
+        BoardChanged();
+        ApplySettings();
+        if (started)
+        {
+            RestartAudio();
+        }
+        RaiseLog($"Loaded a configuration: {Board.Sounds.Count} sound(s), {Board.Wheels.Count} wheel(s)");
     }
 
     // ───────────────────────── audio ─────────────────────────
@@ -329,8 +412,12 @@ public sealed class SoundboardRuntime : IDisposable
         return tcs.Task;
     }
 
-    /// <summary>Describes why a key can't be used (null = free). Call on the UI thread.</summary>
-    public string? FindHotkeyConflict(int virtualKey, Guid? exceptWheel = null, bool exceptStopKey = false, bool exceptPushToTalk = false)
+    /// <summary>
+    /// Describes why a key can't be used for <paramref name="role"/> (null = free). Call on the UI thread.
+    /// The cancel key may share a key with a wheel: wheel keys only act while no wheel is open,
+    /// the cancel key only while one is.
+    /// </summary>
+    public string? FindHotkeyConflict(int virtualKey, HotkeyRole role, Guid? wheelId = null)
     {
         if (virtualKey == VirtualKeys.None)
         {
@@ -340,20 +427,29 @@ public sealed class SoundboardRuntime : IDisposable
         {
             return "Left mouse can't be a hotkey — it would trigger every time you shoot.";
         }
-        foreach (WheelDefinition wheel in Board.Wheels)
+
+        string name = VirtualKeys.GetName(virtualKey);
+        if (role != HotkeyRole.CancelWheel)
         {
-            if (wheel.Hotkey == virtualKey && wheel.Id != exceptWheel)
+            foreach (WheelDefinition wheel in Board.Wheels)
             {
-                return $"{VirtualKeys.GetName(virtualKey)} already opens “{wheel.Name}”.";
+                if (wheel.Hotkey == virtualKey && !(role == HotkeyRole.Wheel && wheel.Id == wheelId))
+                {
+                    return $"{name} already opens “{wheel.Name}”.";
+                }
             }
         }
-        if (!exceptStopKey && Settings.StopKey == virtualKey)
+        if (role != HotkeyRole.StopAll && Settings.StopKey == virtualKey)
         {
-            return $"{VirtualKeys.GetName(virtualKey)} is already the stop-all key.";
+            return $"{name} is already the stop-all key.";
         }
-        if (!exceptPushToTalk && Settings.MicMode == MicMode.AppPushToTalk && Settings.PushToTalkKey == virtualKey)
+        if (role != HotkeyRole.PushToTalk && Settings.MicMode == MicMode.AppPushToTalk && Settings.PushToTalkKey == virtualKey)
         {
-            return $"{VirtualKeys.GetName(virtualKey)} is already your push-to-talk key.";
+            return $"{name} is already your push-to-talk key.";
+        }
+        if (role is HotkeyRole.StopAll or HotkeyRole.PushToTalk && Settings.CancelKey == virtualKey)
+        {
+            return $"{name} is already the cancel key.";
         }
         return null;
     }
@@ -426,6 +522,9 @@ public sealed class SoundboardRuntime : IDisposable
                 break;
             case WheelCloseReason.ReleasedInCentre:
                 RaiseLog("Wheel cancelled (released in the centre)");
+                break;
+            case WheelCloseReason.CancelKeyPressed:
+                RaiseLog("Wheel cancelled (cancel key)");
                 break;
         }
 

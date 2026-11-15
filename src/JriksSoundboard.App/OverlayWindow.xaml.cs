@@ -105,8 +105,9 @@ public partial class OverlayWindow : Window
         double size = Math.Clamp(settings.OverlaySize, 200, 700);
         Wheel.Width = size;
         Wheel.Height = size;
-        Width = size + 20;
-        Height = size + 110;
+        Width = size + 160; // extra width so long names fit above the wheel (the window is click-through)
+        Height = size + 174;
+        NameChip.MaxWidth = Width - 20;
         Root.Opacity = Math.Clamp(settings.OverlayOpacity, 0.3, 1.0);
         TimerHint.Visibility = settings.MicMode == MicMode.GamePushToTalk ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -119,12 +120,26 @@ public partial class OverlayWindow : Window
             ? Enumerable.Repeat(WheelSlotVisual.Empty, 8).ToList()
             : sample.Root.Slots.Select(s => new WheelSlotVisual(s.Label, s.Kind)).ToList();
         Wheel.HighlightedSlot = 1 % Math.Max(1, Wheel.Slots.Count);
-        Wheel.Stick = new System.Windows.Vector(0.45, -0.45);
+        Wheel.Stick = new System.Windows.Vector(0.62, -0.62);
         Wheel.DeadzoneFraction = runtime.Settings.Deadzone / Math.Max(1, runtime.Settings.Radius);
         Wheel.TimeRemaining = runtime.Settings.AutoCancelEnabled ? 0.6 : null;
         Wheel.DwellProgress = 0;
         Wheel.CenterText = sample?.Name ?? "Preview";
+        ShowName(sample is not null && Wheel.HighlightedSlot is int h && h < sample.Root.Slots.Count ? Describe(sample.Root.Slots[h]) : null);
     }
+
+    private void ShowName(string? name)
+    {
+        NameText.Text = name ?? string.Empty;
+        NameChip.Visibility = string.IsNullOrEmpty(name) ? Visibility.Hidden : Visibility.Visible;
+    }
+
+    private static string? Describe(SlotSnapshot slot) => slot.Kind switch
+    {
+        SlotKind.Sound => slot.Label,
+        SlotKind.Folder => $"{slot.Label}  ·  folder",
+        _ => null,
+    };
 
     private void ShowWheel()
     {
@@ -152,7 +167,7 @@ public partial class OverlayWindow : Window
             TimerBar.Value = 0;
             SetPhase(Phase.Timer);
         }
-        else if (reason == WheelCloseReason.TimedOut)
+        else if (reason is WheelCloseReason.TimedOut or WheelCloseReason.CancelKeyPressed)
         {
             Wheel.HighlightedSlot = null;
             Wheel.Stick = null;
@@ -173,6 +188,10 @@ public partial class OverlayWindow : Window
         phaseChanged = DateTime.UtcNow;
         Wheel.Visibility = next is Phase.Timer ? Visibility.Collapsed : Visibility.Visible;
         TimerPill.Visibility = next is Phase.Timer ? Visibility.Visible : Visibility.Collapsed;
+        if (next is not (Phase.Wheel or Phase.Demo))
+        {
+            ShowName(null);
+        }
         timer.Start();
     }
 
@@ -239,6 +258,7 @@ public partial class OverlayWindow : Window
         Wheel.TimeRemaining = state.TimeRemainingFraction;
         Wheel.DwellProgress = state.FolderDwellProgress;
         Wheel.CenterText = state.FolderName ?? state.Wheel?.Name;
+        ShowName(state.HoveredSlot is int h && h < state.Page.Slots.Count ? Describe(state.Page.Slots[h]) : null);
     }
 
     private void PositionAndShow()

@@ -38,6 +38,12 @@ public sealed class WheelView : FrameworkElement
     private string? centerText;
     private bool isOverlayStyle;
     private Palette? palette;
+    private int? hoverSlot;
+    private const double MinLabelSize = 8.5;
+    private readonly Dictionary<(string Label, double Angle, double Across, double Along, bool Bold), FittedLabel> fittedLabels = [];
+
+    /// <summary>The slice under the mouse changed (editor only); null when the mouse left the wheel.</summary>
+    public event Action<int?>? SliceHovered;
 
     public event Action<int>? SliceClicked;
 
@@ -155,6 +161,7 @@ public sealed class WheelView : FrameworkElement
             bool highlighted = i == highlightedSlot;
             Brush fill = i == dropTargetSlot ? p.Drop
                 : highlighted ? p.Highlight
+                : i == hoverSlot ? p.Hover
                 : slot.Kind == SlotKind.Empty ? p.Empty
                 : p.Normal;
 
@@ -164,7 +171,11 @@ public sealed class WheelView : FrameworkElement
             double labelRadius = (inner + outer) / 2;
             double chord = 2 * labelRadius * Math.Sin(Math.Min(Math.PI / 2, width * Math.PI / 360));
             double maxWidth = Math.Min(outer - inner, chord) * 0.9;
-            DrawSlotLabel(dc, slot, highlighted, PointAt(c, labelRadius, mid), maxWidth, p);
+            // Room for a name: across the slice (its width a little inside the label point, where it
+            // is narrower) and along it (the ring's depth).
+            double across = 2 * (labelRadius - (outer - inner) * 0.22) * Math.Sin(Math.Min(Math.PI / 2, width * Math.PI / 360)) * 0.92;
+            double along = (outer - inner) * 0.8;
+            DrawSlotLabel(dc, slot, highlighted, PointAt(c, labelRadius, mid), maxWidth, mid, across, along, p);
         }
 
         dc.DrawEllipse(p.Centre, p.Stroke, c, inner - 3, inner - 3);
@@ -193,7 +204,8 @@ public sealed class WheelView : FrameworkElement
         }
     }
 
-    private void DrawSlotLabel(DrawingContext dc, WheelSlotVisual slot, bool highlighted, Point at, double maxWidth, Palette p)
+    private void DrawSlotLabel(DrawingContext dc, WheelSlotVisual slot, bool highlighted, Point at, double maxWidth,
+        double angle, double across, double along, Palette p)
     {
         double size = isOverlayStyle ? 13 : 12;
         Brush brush = highlighted ? p.TextOnHighlight : slot.IsMissing ? p.Caution : p.Text;
@@ -218,10 +230,135 @@ public sealed class WheelView : FrameworkElement
 
             default:
                 string label = slot.IsMissing ? "⚠ " + slot.Label : slot.Label;
-                FormattedText text = Text(label, size, brush, highlighted ? FontWeights.SemiBold : FontWeights.Normal, maxWidth, 2, TextFont);
-                dc.DrawText(text, new Point(at.X - maxWidth / 2, at.Y - text.Height / 2));
+                FormattedText text = FitLabel(label, size, brush, highlighted ? FontWeights.SemiBold : FontWeights.Normal, angle, across, along);
+                dc.DrawText(text, new Point(at.X - text.MaxTextWidth / 2, at.Y - text.Height / 2));
                 break;
         }
+    }
+
+    /// <summary>
+    /// Makes as much of a long name visible as possible: shrinks the font (down to 8.5), lets it
+    /// wrap at spaces, underscores, dashes and dots, and breaks a part mid-word only if it still
+    /// doesn't fit. Only after all that is the name cut with "…". Results are cached per name and
+    /// slice size, so redrawing the overlay every frame stays cheap.
+    /// </summary>
+    private FormattedText FitLabel(string label, double baseSize, Brush brush, FontWeight weight, double angleDegrees, double across, double along)
+    {
+        // The text box is upright, but the slice points at an angle. An upright w×h box centred on
+        // the label point stays inside the slice when its extent across the slice (w·cos + h·sin)
+        // and along it (w·sin + h·cos) fit — so side slices get wide, short boxes and top/bottom
+        // slices tall, narrow ones, and long names never spill into the neighbours.
+        double radians = angleDegrees * Math.PI / 180;
+        double cos = Math.Abs(Math.Cos(radians));
+        double sin = Math.Abs(Math.Sin(radians));
+
+        double WidestFor(double height) => Math.Max(height, Math.Min(
+            cos > 0.001 ? (across - height * sin) / cos : double.MaxValue,
+            sin > 0.001 ? (along - height * cos) / sin : double.MaxValue));
+        double TallestFor(double boxWidth) => Math.Min(
+            sin > 0.001 ? (across - boxWidth * cos) / sin : double.MaxValue,
+            cos > 0.001 ? (along - boxWidth * sin) / cos : double.MaxValue);
+
+        var key = (label, Math.Round(angleDegrees), Math.Round(across), Math.Round(along), weight == FontWeights.SemiBold);
+        if (!fittedLabels.TryGetValue(key, out FittedLabel fitted))
+        {
+            bool found = false;
+            string wrappable = WithBreaks(label, null);
+            for (double size = baseSize; size >= MinLabelSize && !found; size -= 0.5)
+            {
+                double widest = WidestFor(size * 1.34);
+                double step = Math.Max(2, widest / 10);
+                for (double boxWidth = widest; boxWidth >= size * 3 && !found; boxWidth -= step)
+                {
+                    if (LabelParts(label).Any(part => WidthOf(part, size, weight) > boxWidth))
+                    {
+                        break; // narrower boxes would only make this worse
+                    }
+                    double height = Text(wrappable, size, Brushes.White, weight, boxWidth, int.MaxValue, TextFont).Height;
+                    if (height <= TallestFor(boxWidth) + 0.5)
+                    {
+                        fitted = new FittedLabel(size, wrappable, boxWidth, int.MaxValue);
+                        found = true;
+                    }
+                }
+            }
+
+            if (!found)
+            {
+                // Still too long: smallest size, the box shape that shows the most text (e.g. two short
+                // lines instead of one long one on diagonal slices), parts broken mid-word — then "…".
+                double lineHeight = MinLabelSize * 1.34;
+                double bestWidth = WidestFor(lineHeight);
+                int bestLines = Math.Max(1, (int)(TallestFor(bestWidth) / lineHeight));
+                for (double boxWidth = bestWidth; boxWidth >= MinLabelSize * 3; boxWidth -= 2)
+                {
+                    int lines = Math.Max(1, (int)(TallestFor(boxWidth) / lineHeight));
+                    if (lines * boxWidth > bestLines * bestWidth)
+                    {
+                        bestWidth = boxWidth;
+                        bestLines = lines;
+                    }
+                }
+                double chosenWidth = bestWidth;
+                fitted = new FittedLabel(MinLabelSize, WithBreaks(label, part => WidthOf(part, MinLabelSize, weight) > chosenWidth), chosenWidth, bestLines);
+            }
+
+            if (fittedLabels.Count > 1000)
+            {
+                fittedLabels.Clear();
+            }
+            fittedLabels[key] = fitted;
+        }
+
+        return Text(fitted.Text, fitted.Size, brush, weight, fitted.Width, fitted.MaxLines, TextFont);
+    }
+
+    private readonly record struct FittedLabel(double Size, string Text, double Width, int MaxLines);
+
+    /// <summary>Splits a name after spaces, underscores, dashes, dots and slashes (separator stays with the part).</summary>
+    private static List<string> LabelParts(string label)
+    {
+        var parts = new List<string>();
+        int start = 0;
+        for (int i = 0; i < label.Length; i++)
+        {
+            if (label[i] is ' ' or '_' or '-' or '.' or '/')
+            {
+                parts.Add(label[start..(i + 1)]);
+                start = i + 1;
+            }
+        }
+        if (start < label.Length)
+        {
+            parts.Add(label[start..]);
+        }
+        return parts;
+    }
+
+    /// <summary>Adds invisible break opportunities after separators (and inside parts that match <paramref name="breakEverywhere"/>).</summary>
+    private static string WithBreaks(string label, Func<string, bool>? breakEverywhere)
+    {
+        const char zeroWidthSpace = '​';
+        var builder = new System.Text.StringBuilder(label.Length * 2);
+        foreach (string part in LabelParts(label))
+        {
+            if (breakEverywhere?.Invoke(part) == true)
+            {
+                foreach (char ch in part)
+                {
+                    builder.Append(ch).Append(zeroWidthSpace);
+                }
+            }
+            else
+            {
+                builder.Append(part);
+                if (part[^1] is '_' or '-' or '.' or '/')
+                {
+                    builder.Append(zeroWidthSpace);
+                }
+            }
+        }
+        return builder.ToString();
     }
 
     /// <summary>
@@ -233,7 +370,7 @@ public sealed class WheelView : FrameworkElement
         const double minSize = 8;
         double size = isOverlayStyle ? 13 : 12;
         string[] words = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        while (size > minSize && words.Max(w => WidthOf(w, size)) > maxWidth)
+        while (size > minSize && words.Max(w => WidthOf(w, size, FontWeights.SemiBold)) > maxWidth)
         {
             size -= 0.5;
         }
@@ -242,9 +379,9 @@ public sealed class WheelView : FrameworkElement
         dc.DrawText(text, new Point(c.X - maxWidth / 2, c.Y - text.Height / 2));
     }
 
-    private double WidthOf(string word, double size) =>
+    private double WidthOf(string word, double size, FontWeight weight) =>
         new FormattedText(word, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-            new Typeface(new FontFamily(TextFont), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            new Typeface(new FontFamily(TextFont), FontStyles.Normal, weight, FontStretches.Normal),
             size, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip).WidthIncludingTrailingWhitespace;
 
     private FormattedText Text(string text, double size, Brush brush, FontWeight weight, double maxWidth, int maxLines, string font) =>
@@ -320,9 +457,30 @@ public sealed class WheelView : FrameworkElement
         e.Handled = true;
     }
 
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        SetHover(null);
+    }
+
+    private void SetHover(int? index)
+    {
+        if (hoverSlot == index)
+        {
+            return;
+        }
+        hoverSlot = index;
+        InvalidateVisual();
+        SliceHovered?.Invoke(index);
+    }
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (IsEditable)
+        {
+            SetHover(SliceAt(e.GetPosition(this)));
+        }
         if (pressedSlot is not int from || e.LeftButton != MouseButtonState.Pressed)
         {
             return;
@@ -400,7 +558,7 @@ public sealed class WheelView : FrameworkElement
     // ───────────────────────── colours ─────────────────────────
 
     private sealed record Palette(
-        Brush? Backdrop, Brush Normal, Brush Empty, Brush Highlight, Brush Drop, Pen Stroke,
+        Brush? Backdrop, Brush Normal, Brush Empty, Brush Hover, Brush Highlight, Brush Drop, Pen Stroke,
         Brush Text, Brush TextOnHighlight, Brush Caution, Brush Hint, Brush Centre,
         Brush StickBrush, Pen StickPen, Pen TimerPen, Pen TrackPen, Pen DwellPen)
     {
@@ -411,6 +569,7 @@ public sealed class WheelView : FrameworkElement
                 Backdrop: Solid(Color.FromArgb(0xD9, 0x12, 0x12, 0x16)),
                 Normal: Solid(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)),
                 Empty: Solid(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF)),
+                Hover: Solid(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
                 Highlight: accent,
                 Drop: accent,
                 Stroke: Pen(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF), 1),
@@ -434,6 +593,7 @@ public sealed class WheelView : FrameworkElement
                 Backdrop: null,
                 Normal: Solid(Color.FromArgb(0x38, 0x80, 0x80, 0x80)),
                 Empty: Solid(Color.FromArgb(0x14, 0x80, 0x80, 0x80)),
+                Hover: Solid(Color.FromArgb(0x60, 0x80, 0x80, 0x80)),
                 Highlight: accent,
                 Drop: Resource("AccentFillColorSecondaryBrush", Color.FromRgb(0x60, 0xA5, 0xFA)),
                 Stroke: Pen(Color.FromArgb(0x70, 0x80, 0x80, 0x80), 1),

@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private WheelDefinition? currentWheel;
     private WheelSlot? openFolder; // folder slot being edited; null = the wheel itself
     private int? selectedSlot;
+    private int? hoveredSlot;
     private SoundItem? selectedSound;
     private SoundItem? dragCandidate;
     private Point dragStart;
@@ -56,6 +57,11 @@ public partial class MainWindow : Window
         EditorWheel.SliceDoubleClicked += OnSliceDoubleClicked;
         EditorWheel.SoundDropped += OnSoundDropped;
         EditorWheel.SliceMoved += OnSliceMoved;
+        EditorWheel.SliceHovered += index =>
+        {
+            hoveredSlot = index;
+            UpdateSliceName();
+        };
 
         overlay = new OverlayWindow(runtime, this);
         runtime.AudioStatusChanged += _ => Dispatcher.BeginInvoke(UpdateStatus);
@@ -180,6 +186,7 @@ public partial class MainWindow : Window
         }
 
         settingsWindow = new SettingsWindow(runtime, log, overlay) { Owner = this };
+        settingsWindow.ConfigurationLoaded += OnConfigurationLoaded;
         settingsWindow.Closed += (_, _) =>
         {
             settingsWindow = null;
@@ -188,6 +195,24 @@ public partial class MainWindow : Window
         };
         settingsWindow.Show();
         return settingsWindow;
+    }
+
+    /// <summary>A backup was loaded: everything on screen now points at replaced content.</summary>
+    private void OnConfigurationLoaded()
+    {
+        currentWheel = null;
+        openFolder = null;
+        selectedSlot = null;
+        hoveredSlot = null;
+        selectedSound = null;
+        LibraryList.SelectedItem = null;
+        WheelTabs.SelectedIndex = -1;
+        WheelTabs.SelectedIndex = runtime.Board.Wheels.Count > 0 ? 0 : -1;
+        currentWheel ??= WheelTabs.SelectedItem as WheelDefinition;
+        UpdateLibraryHeader();
+        UpdateSoundDetails();
+        RefreshEditor();
+        UpdateStatus();
     }
 
     // ───────────────────────── library ─────────────────────────
@@ -650,7 +675,7 @@ public partial class MainWindow : Window
         {
             return;
         }
-        if (runtime.FindHotkeyConflict(vk, exceptWheel: wheel.Id) is { } conflict)
+        if (runtime.FindHotkeyConflict(vk, HotkeyRole.Wheel, wheel.Id) is { } conflict)
         {
             MessageBox.Show(this, conflict, "Key already in use", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -695,6 +720,27 @@ public partial class MainWindow : Window
         {
             populating = false;
         }
+        UpdateSliceName();
+    }
+
+    /// <summary>Full name of the slice under the mouse (or the selected one) above the wheel.</summary>
+    private void UpdateSliceName()
+    {
+        int? index = hoveredSlot ?? selectedSlot;
+        if (CurrentPage is not { } page || index is not int i || i >= page.Slots.Count)
+        {
+            SliceNameText.Text = string.Empty;
+            return;
+        }
+
+        WheelSlot slot = page.Slots[i];
+        SliceNameText.Text = slot.Kind switch
+        {
+            SlotKind.Sound => slot.SoundId is Guid id && runtime.Board.FindSound(id) is { } sound ? slot.Label ?? sound.Name : string.Empty,
+            SlotKind.Folder => $"{slot.Label} (folder)",
+            _ => "Empty slice",
+        };
+        SliceNameText.Opacity = hoveredSlot is null ? 0.7 : 1.0;
     }
 
     private WheelSlotVisual ToVisual(WheelSlot slot)
@@ -762,6 +808,7 @@ public partial class MainWindow : Window
         {
             RefreshSlotPanel(page);
         }
+        UpdateSliceName();
     }
 
     private void OnSliceDoubleClicked(int index)

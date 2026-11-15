@@ -7,8 +7,15 @@
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="False"
         ResizeMode="NoResize" Width="400" Height="480">
     <Grid x:Name="Root">
+        <!-- Full name of the slice you're pointing at (slice labels get shortened on busy wheels). -->
+        <Border x:Name="NameChip" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,4,0,0"
+                Padding="16,7" CornerRadius="15" Background="#E6141418" Visibility="Hidden">
+            <TextBlock x:Name="NameText" Foreground="White" FontSize="15" FontWeight="SemiBold"
+                       TextAlignment="Center" TextWrapping="Wrap" MaxHeight="44" TextTrimming="CharacterEllipsis" />
+        </Border>
+
         <local:WheelView x:Name="Wheel" IsOverlayStyle="True" Width="380" Height="380"
-                         VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                         VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,64,0,0" />
 
         <Border x:Name="TimerPill" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,10"
                 Padding="18,10" CornerRadius="16" Background="#E6141418" Visibility="Collapsed">

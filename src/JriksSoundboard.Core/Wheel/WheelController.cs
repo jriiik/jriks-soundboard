@@ -20,6 +20,9 @@ public enum WheelCloseReason
     /// <summary>Held open longer than the auto-cancel time.</summary>
     TimedOut,
 
+    /// <summary>The cancel key was pressed while the wheel was open.</summary>
+    CancelKeyPressed,
+
     /// <summary>Closed by the app (e.g. while you rebind a key).</summary>
     Cancelled,
 }
@@ -28,7 +31,17 @@ public enum WheelCloseReason
 /// <param name="FolderDwell">How long to rest on a folder before it opens.</param>
 /// <param name="Deadzone">Raw mouse counts before a direction counts.</param>
 /// <param name="Radius">Max virtual stick distance.</param>
-public sealed record WheelOptions(TimeSpan? AutoCancelAfter, TimeSpan FolderDwell, double Deadzone, double Radius)
+/// <param name="RestartTimerOnHover">Pointing at a different slice gives the auto-cancel timer its full time again,
+/// so it only runs out once you stop browsing.</param>
+/// <param name="CancelKey">Key that closes an open wheel without playing anything (0 = none).
+/// May be another wheel's hotkey: it only acts as "cancel" while a wheel is open.</param>
+public sealed record WheelOptions(
+    TimeSpan? AutoCancelAfter,
+    TimeSpan FolderDwell,
+    double Deadzone,
+    double Radius,
+    bool RestartTimerOnHover = true,
+    int CancelKey = 0)
 {
     public static readonly WheelOptions Default = new(TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(350), 60, 240);
 }
@@ -67,7 +80,7 @@ public sealed class WheelController
     private WheelSnapshot? wheel;
     private PageSnapshot? page;
     private string? folderName;
-    private TimeSpan pageOpenedAt;
+    private TimeSpan timerStartedAt;
     private TimeSpan hoverSince;
     private int? hovered;
     private int suppressedKey;
@@ -112,32 +125,50 @@ public sealed class WheelController
     /// <summary>Returns true if the key belongs to the wheel system (so nothing else should act on it).</summary>
     public bool ButtonDown(int virtualKey)
     {
-        WheelSnapshot? opened;
+        WheelSnapshot? opened = null;
+        WheelSnapshot? cancelled = null;
         lock (gate)
         {
             if (virtualKey == VirtualKeys.None)
             {
                 return false;
             }
+
             if (wheel is not null)
             {
-                return virtualKey == wheel.Hotkey; // another wheel's key while one is open: ignored
+                if (virtualKey != options.CancelKey)
+                {
+                    return virtualKey == wheel.Hotkey; // another wheel's key while one is open: ignored
+                }
+                cancelled = wheel;
+                suppressedKey = wheel.Hotkey; // the wheel key is still held; its release must do nothing
+                selector.Cancel();
+                ResetLocked();
             }
-            if (virtualKey == suppressedKey)
+            else if (virtualKey == suppressedKey)
             {
                 return true;
             }
-
-            opened = board.WheelForKey(virtualKey);
-            if (opened is null)
+            else
             {
-                return false;
+                opened = board.WheelForKey(virtualKey);
+                if (opened is null)
+                {
+                    return false;
+                }
+                wheel = opened;
+                OpenPageLocked(opened.Root, null);
             }
-            wheel = opened;
-            OpenPageLocked(opened.Root, null);
         }
 
-        Opened?.Invoke(opened);
+        if (cancelled is not null)
+        {
+            Closed?.Invoke(cancelled, WheelCloseReason.CancelKeyPressed, null);
+        }
+        else if (opened is not null)
+        {
+            Opened?.Invoke(opened);
+        }
         return true;
     }
 
@@ -203,7 +234,7 @@ public sealed class WheelController
             TimeSpan now = clock();
             UpdateHoverLocked(now);
 
-            if (options.AutoCancelAfter is { } limit && now - pageOpenedAt >= limit)
+            if (options.AutoCancelAfter is { } limit && now - timerStartedAt >= limit)
             {
                 timedOut = wheel;
                 suppressedKey = wheel.Hotkey; // the key is still held; its release must do nothing
@@ -258,7 +289,7 @@ public sealed class WheelController
             }
 
             double? remaining = options.AutoCancelAfter is { } limit && limit > TimeSpan.Zero
-                ? Math.Clamp(1 - (now - pageOpenedAt) / limit, 0, 1)
+                ? Math.Clamp(1 - (now - timerStartedAt) / limit, 0, 1)
                 : null;
 
             return new WheelViewState(true, wheel, page, folderName, stick.X, stick.Y, stick.Deadzone, stick.Radius,
@@ -272,8 +303,8 @@ public sealed class WheelController
         folderName = newFolderName;
         selector.SliceCount = Math.Clamp(newPage.Slots.Count, WheelSelector.MinSlices, WheelSelector.MaxSlices);
         selector.Begin();
-        pageOpenedAt = clock();
-        hoverSince = pageOpenedAt;
+        timerStartedAt = clock();
+        hoverSince = timerStartedAt;
         hovered = null;
     }
 
@@ -284,6 +315,10 @@ public sealed class WheelController
         {
             hovered = current;
             hoverSince = now;
+            if (current is not null && options.RestartTimerOnHover)
+            {
+                timerStartedAt = now; // still browsing: give the full time again
+            }
             return;
         }
 
