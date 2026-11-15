@@ -1,0 +1,43 @@
+# Builds a single-file JriksSoundboard.exe on GitHub's Windows runner and publishes a
+# GitHub Release whenever a version tag is pushed:  git tag v0.2.0 && git push origin v0.2.0
+# Release text comes from .github/release-notes.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # needed to create the release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish single-file exe
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          dotnet publish src/JriksSoundboard.App/JriksSoundboard.App.csproj `
+            --configuration Release --runtime win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:Version=$version `
+            --output publish
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' publish/JriksSoundboard.exe `
+            --title "Jrik's Soundboard ${{ github.ref_name }}" `
+            --notes-file .github/release-notes.md
