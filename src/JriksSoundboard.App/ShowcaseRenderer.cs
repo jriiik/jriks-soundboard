@@ -22,8 +22,8 @@ internal sealed class ShowcaseRenderer
     private const double Deadzone = 0.25;
     private const double AutoCancelMs = 3000;
     private const double FlickLength = 0.93; // a real flick usually clamps near the rim (and stays off the label)
-    private const double TotalMs = 6800;
-    public const int FramesPerSecond = 20;
+    private const double TotalMs = 12800;
+    public const int FramesPerSecond = 15;
 
     private readonly Grid root;
     private readonly WheelView wheel;
@@ -117,9 +117,9 @@ internal sealed class ShowcaseRenderer
             Save(StateAt(t), Path.Combine(frames, $"frame_{index++:000}.png"), scale: 1);
         }
 
-        Save(StateAt(900), Path.Combine(folder, "wheel-hero.png"), scale: 1.5);
-        Save(StateAt(3400 + 600 + 250), Path.Combine(folder, "folder-rest.png"), scale: 1.5);
-        Save(StateAt(3400 + 950 + 750), Path.Combine(folder, "folder-open.png"), scale: 1.5);
+        Save(StateAt(2200), Path.Combine(folder, "wheel-hero.png"), scale: 1.5);
+        Save(StateAt(5500 + 1400 + 600), Path.Combine(folder, "folder-rest.png"), scale: 1.5);
+        Save(StateAt(5500 + 2300 + 1800), Path.Combine(folder, "folder-open.png"), scale: 1.5);
         Save(new Frame("Changed your mind? Just wait…", rootPage, wheelName, new Vector(0.04, -0.03), 0, 0.12, null, 0),
             Path.Combine(folder, "auto-cancel.png"), scale: 1.5);
     }
@@ -133,33 +133,37 @@ internal sealed class ShowcaseRenderer
         string folderSound = folderPage.Slots[folderSoundIndex].Label;
         var blank = new Frame(string.Empty, null, string.Empty, default, 0, null, null, 0);
 
+        // Timings are stretched compared to real use so every caption stays up long enough to read.
+        // The ring refills when the stick reaches a slice, like the real auto-cancel timer.
+
         // Part 1 — pick a sound.
-        if (t < 300) return new("Hold Mouse 4", rootPage, wheelName, default, 0, Ring(t), null, 0);
-        if (t < 650) return new("Flick toward a sound", rootPage, wheelName, toSound * Ease((t - 300) / 350), 0, Ring(t), null, 0);
-        if (t < 1050) return new("Release to play", rootPage, wheelName, toSound, 0, Ring(t), null, 0);
-        if (t < 3050)
+        if (t < 1200) return new("Hold Mouse 4", rootPage, wheelName, default, 0, Ring(t), null, 0);
+        if (t < 1700) return new("Flick toward a sound", rootPage, wheelName, toSound * Ease((t - 1200) / 500), 0, Ring(t - 1200), null, 0);
+        if (t < 2900) return new("Release to play", rootPage, wheelName, toSound, 0, Ring(t - 1200), null, 0);
+        if (t < 4900)
         {
-            double done = (t - 1050) / 2000;
+            double done = (t - 2900) / 2000;
             return new("It plays through your mic", null, string.Empty, default, 0, null, $"{firstSound} · {2.0 * (1 - done):0.0}s", done * 100);
         }
-        if (t < 3400) return blank;
+        if (t < 5500) return blank;
 
         // Part 2 — folders.
-        double b = t - 3400;
-        if (b < 300) return new("Hold Mouse 4", rootPage, wheelName, default, 0, Ring(b), null, 0);
-        if (b < 600) return new("Flick to a folder", rootPage, wheelName, toFolder * Ease((b - 300) / 300), 0, Ring(b), null, 0);
-        if (b < 950) return new("Rest on it…", rootPage, wheelName, toFolder, (b - 600) / 350, Ring(b), null, 0);
+        double b = t - 5500;
+        if (b < 900) return new("Hold Mouse 4", rootPage, wheelName, default, 0, Ring(b), null, 0);
+        if (b < 1400) return new("Flick to a folder", rootPage, wheelName, toFolder * Ease((b - 900) / 500), 0, Ring(b - 900), null, 0);
+        if (b < 2300) return new("Rest on it…", rootPage, wheelName, toFolder, (b - 1400) / 900, Ring(b - 900), null, 0);
 
-        double c = b - 950; // folder open: the timer restarts
-        if (c < 300) return new("…and it opens", folderPage, folderName, default, 0, Ring(c), null, 0);
-        if (c < 600) return new("Flick again inside", folderPage, folderName, inFolder * Ease((c - 300) / 300), 0, Ring(c), null, 0);
-        if (c < 900) return new("Release", folderPage, folderName, inFolder, 0, Ring(c), null, 0);
+        double c = b - 2300; // folder open: the timer restarts
+        if (c < 1000) return new("…and it opens", folderPage, folderName, default, 0, Ring(c), null, 0);
+        if (c < 1500) return new("Flick again inside", folderPage, folderName, inFolder * Ease((c - 1000) / 500), 0, Ring(c - 1000), null, 0);
+        if (c < 2400) return new("Release", folderPage, folderName, inFolder, 0, Ring(c - 1000), null, 0);
 
-        double d = c - 900;
-        if (d < 1100)
+        double d = c - 2400;
+        if (d < 1800)
         {
-            double done = d / 1100;
-            return new("Up to 256 sounds on one key", null, string.Empty, default, 0, null, $"{folderSound} · {1.1 * (1 - done):0.0}s", done * 100);
+            double done = Math.Min(1, d / 1100);
+            string? pill = d < 1100 ? $"{folderSound} · {1.1 * (1 - done):0.0}s" : null;
+            return new("Up to 256 sounds on one key", null, string.Empty, default, 0, null, pill, done * 100);
         }
         return blank;
     }
