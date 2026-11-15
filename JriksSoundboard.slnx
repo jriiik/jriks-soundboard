@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JriksSoundboard.App/JriksSoundboard.App.csproj" />
+    <Project Path="src/JriksSoundboard.Core/JriksSoundboard.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JriksSoundboard.Core.Tests/JriksSoundboard.Core.Tests.csproj" />
+  </Folder>
+</Solution>

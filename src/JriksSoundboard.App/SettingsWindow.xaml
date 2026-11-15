@@ -1,0 +1,321 @@
+<Window x:Class="JriksSoundboard.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:board="clr-namespace:JriksSoundboard.Core.Board;assembly=JriksSoundboard.Core"
+        Title="Settings — Jrik's Soundboard"
+        Width="780" Height="760" MinWidth="640" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource WindowBase}">
+
+    <Window.Resources>
+        <Style x:Key="OptionTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="TabBody" TargetType="StackPanel">
+            <Setter Property="Margin" Value="4,16,16,16" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <TabControl x:Name="Tabs">
+
+            <!-- ───────── Audio ───────── -->
+            <TabItem Header="Audio">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,4" Text="Send sounds to the game (virtual mic)" />
+                        <ComboBox x:Name="GameDeviceBox" SelectionChanged="OnDeviceChanged" />
+                        <TextBlock x:Name="CableHint" Style="{StaticResource Hint}" />
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Hear sounds yourself (monitor)" Margin="0,16,0,4" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox x:Name="MonitorEnabledBox" VerticalAlignment="Center" Margin="0,0,8,0"
+                                      Checked="OnMonitorToggled" Unchecked="OnMonitorToggled" />
+                            <ComboBox x:Name="MonitorDeviceBox" Grid.Column="1" SelectionChanged="OnDeviceChanged" />
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Sound volume (in game)" VerticalAlignment="Center" />
+                            <Slider x:Name="SoundVolumeSlider" Grid.Column="1" Minimum="0" Maximum="150" VerticalAlignment="Center" ValueChanged="OnLevelChanged" />
+                            <TextBlock x:Name="SoundVolumeText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="1" Text="Monitor volume" VerticalAlignment="Center" />
+                            <Slider x:Name="MonitorVolumeSlider" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="100" VerticalAlignment="Center" ValueChanged="OnLevelChanged" />
+                            <TextBlock x:Name="MonitorVolumeText" Grid.Row="1" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <CheckBox x:Name="NormalizeBox" Margin="0,16,0,0" Checked="OnAudioOptionChanged" Unchecked="OnAudioOptionChanged"
+                                  Content="Even out loudness (quiet clips louder, ear-rape clips quieter)" />
+                        <CheckBox x:Name="StopPreviousBox" Margin="0,8,0,0" Checked="OnAudioOptionChanged" Unchecked="OnAudioOptionChanged"
+                                  Content="A new sound stops the one already playing" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                            <Button Content="Restart audio" Click="OnRestartAudio" Margin="0,0,8,0" />
+                            <Button Content="Refresh device list" Click="OnRefreshDevices" />
+                        </StackPanel>
+                        <TextBlock x:Name="AudioStatusText" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Microphone ───────── -->
+            <TabItem Header="Microphone">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,4" Text="Your real microphone" />
+                        <ComboBox x:Name="MicDeviceBox" SelectionChanged="OnDeviceChanged" />
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="0,20,0,8" Text="How your voice and the sounds reach the game" />
+
+                        <RadioButton x:Name="ModeGamePtt" GroupName="MicMode" Checked="OnMicModeChanged" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Use CS2's own push-to-talk (recommended)" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                           Text="Your mic and the sounds always go to the virtual mic. Hold your normal CS2 push-to-talk key while a sound plays — the overlay shows how long to keep holding." />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="ModeAppPtt" GroupName="MicMode" Checked="OnMicModeChanged">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Push-to-talk handled by this app" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                           Text="Set CS2 to open mic. Your voice only goes through while you hold the key below; soundboard sounds always go through without holding anything." />
+                            </StackPanel>
+                        </RadioButton>
+                        <StackPanel x:Name="PttKeyRow" Orientation="Horizontal" Margin="30,8,0,12">
+                            <TextBlock Text="Push-to-talk key:" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <TextBlock x:Name="PttKeyText" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Button Content="Change…" Click="OnChangePttKey" />
+                        </StackPanel>
+
+                        <RadioButton x:Name="ModeVoice" GroupName="MicMode" Checked="OnMicModeChanged">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Voice activation" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                           Text="Set CS2 to open mic. Your voice goes through when it's louder than the threshold; soundboard sounds always go through." />
+                            </StackPanel>
+                        </RadioButton>
+                        <Grid x:Name="VoiceRow" Margin="30,8,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="64" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Threshold" VerticalAlignment="Center" />
+                            <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="-70" Maximum="-10" VerticalAlignment="Center" ValueChanged="OnThresholdChanged" />
+                            <TextBlock x:Name="ThresholdText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock x:Name="MicLevelText" Grid.Row="1" Text="Mic level" VerticalAlignment="Center" Margin="0,8,0,0" />
+                            <ProgressBar x:Name="MicMeter" Grid.Row="1" Grid.Column="1" Height="8" Maximum="100" Margin="0,8,0,0" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <RadioButton x:Name="ModeOff" GroupName="MicMode" Checked="OnMicModeChanged" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Microphone off" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0" Text="Only soundboard sounds reach the game." />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Mic volume" VerticalAlignment="Center" />
+                            <Slider x:Name="MicVolumeSlider" Grid.Column="1" Minimum="0" Maximum="150" VerticalAlignment="Center" ValueChanged="OnLevelChanged" />
+                            <TextBlock x:Name="MicVolumeText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Wheel ───────── -->
+            <TabItem Header="Wheel">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Auto-cancel" />
+                        <CheckBox x:Name="AutoCancelBox" Checked="OnWheelOptionChanged" Unchecked="OnWheelOptionChanged"
+                                  Content="Close the wheel by itself if I don't pick anything" />
+                        <Grid x:Name="AutoCancelRow" Margin="30,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="64" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Cancel after" VerticalAlignment="Center" />
+                            <Slider x:Name="AutoCancelSlider" Grid.Column="1" Minimum="0.5" Maximum="10" TickFrequency="0.5" IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center" ValueChanged="OnWheelSliderChanged" />
+                            <TextBlock x:Name="AutoCancelText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}" Margin="30,6,0,0"
+                                   Text="Hold the wheel key without choosing and it closes on its own — releasing afterwards plays nothing. A ring around the wheel shows the time left; opening a folder restarts it." />
+                        <CheckBox x:Name="TimeoutCueBox" Margin="30,10,0,0" Checked="OnWheelOptionChanged" Unchecked="OnWheelOptionChanged"
+                                  Content="Play a soft cue in my headphones when it cancels (the game never hears it)" />
+
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Flick feel" Margin="0,26,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="64" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Deadzone (flick needed)" VerticalAlignment="Center" />
+                            <Slider x:Name="DeadzoneSlider" Grid.Column="1" Minimum="10" Maximum="400" VerticalAlignment="Center" ValueChanged="OnWheelSliderChanged" />
+                            <TextBlock x:Name="DeadzoneText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="1" Text="Max stick distance" VerticalAlignment="Center" />
+                            <Slider x:Name="RadiusSlider" Grid.Row="1" Grid.Column="1" Minimum="60" Maximum="1500" VerticalAlignment="Center" ValueChanged="OnWheelSliderChanged" />
+                            <TextBlock x:Name="RadiusText" Grid.Row="1" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="2" Text="Folder opens after" VerticalAlignment="Center" />
+                            <Slider x:Name="DwellSlider" Grid.Row="2" Grid.Column="1" Minimum="150" Maximum="1000" VerticalAlignment="Center" ValueChanged="OnWheelSliderChanged" />
+                            <TextBlock x:Name="DwellText" Grid.Row="2" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Button Content="Reset to defaults" Click="OnResetFeel" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Units are raw mouse counts, so they depend on your mouse DPI. Defaults: deadzone 60, max distance 240, folder 350 ms. Smaller deadzone = smaller flick; smaller max distance = quicker to change your mind." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Overlay ───────── -->
+            <TabItem Header="Overlay">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,8" Text="Where the wheel pops up" />
+
+                        <RadioButton x:Name="OverlayGame" GroupName="Overlay" Checked="OnOverlayModeChanged" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="On top of the game" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                           Text="⚠ Only works when CS2 runs in Windowed or Fullscreen Windowed mode — not exclusive Fullscreen." />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="OverlayApp" GroupName="Overlay" Checked="OnOverlayModeChanged" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Over this app's window" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                           Text="Put the soundboard on your second monitor and glance at it there. Works with any game display mode." />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="OverlayOff" GroupName="Overlay" Checked="OnOverlayModeChanged" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionTitle}" Text="Don't show it" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0" Text="Rely on muscle memory." />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <StackPanel x:Name="OverlayOptions">
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="190" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="64" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Size" VerticalAlignment="Center" />
+                                <Slider x:Name="OverlaySizeSlider" Grid.Column="1" Minimum="240" Maximum="600" VerticalAlignment="Center" ValueChanged="OnOverlaySliderChanged" />
+                                <TextBlock x:Name="OverlaySizeText" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="1" Text="Opacity" VerticalAlignment="Center" />
+                                <Slider x:Name="OverlayOpacitySlider" Grid.Row="1" Grid.Column="1" Minimum="40" Maximum="100" VerticalAlignment="Center" ValueChanged="OnOverlaySliderChanged" />
+                                <TextBlock x:Name="OverlayOpacityText" Grid.Row="1" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <CheckBox x:Name="PlaybackTimerBox" Margin="0,14,0,0" Checked="OnOverlayOptionChanged" Unchecked="OnOverlayOptionChanged"
+                                      Content="After choosing, show how long the sound has left" />
+                            <Button x:Name="PreviewOverlayButton" Content="Preview overlay (3 s)" Click="OnPreviewOverlay" HorizontalAlignment="Left" Margin="0,16,0,0" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,16,0,0"
+                                   Text="The overlay is its own see-through window: it never takes focus, ignores clicks and is not drawn inside the game." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Hotkeys ───────── -->
+            <TabItem Header="Hotkeys">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Style="{StaticResource TabBody}">
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,16"
+                                   Text="Hotkeys are only observed — never blocked, changed or sent anywhere — so the game still receives the key too. Pick keys CS2 doesn't use; mouse side buttons are ideal." />
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Wheels" />
+                        <ItemsControl x:Name="WheelHotkeyList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type board:WheelDefinition}">
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding HotkeyName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="Change…" Click="OnChangeWheelHotkey" Tag="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Other" Margin="0,24,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Stop all sounds" VerticalAlignment="Center" />
+                            <TextBlock x:Name="StopKeyText" Grid.Column="1" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Change…" Click="OnChangeStopKey" Margin="0,0,8,0" />
+                            <Button Grid.Column="3" Content="Clear" Click="OnClearStopKey" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,12,0,0"
+                                   Text="The app push-to-talk key (if you use that mode) is set on the Microphone tab." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───────── Diagnostics ───────── -->
+            <TabItem Header="Diagnostics">
+                <Grid Margin="4,16,16,16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Padding="12,10" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <TextBlock x:Name="BackgroundText" TextWrapping="Wrap" />
+                    </Border>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button Content="Play test tone in game" Click="OnTestTone" Margin="0,0,8,0" />
+                        <Button Content="Open data folder" Click="OnOpenDataFolder" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Style="{StaticResource SectionTitle}" Text="Event log" Margin="0,18,0,8" />
+                    <ListBox x:Name="LogList" Grid.Row="3" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

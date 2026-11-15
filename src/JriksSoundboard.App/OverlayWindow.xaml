@@ -1,0 +1,24 @@
+<Window x:Class="JriksSoundboard.App.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:JriksSoundboard.App"
+        Title="Soundboard overlay"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="False"
+        ResizeMode="NoResize" Width="400" Height="480">
+    <Grid x:Name="Root">
+        <local:WheelView x:Name="Wheel" IsOverlayStyle="True" Width="380" Height="380"
+                         VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,10,0,0" />
+
+        <Border x:Name="TimerPill" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,10"
+                Padding="18,10" CornerRadius="16" Background="#E6141418" Visibility="Collapsed">
+            <StackPanel Width="250">
+                <TextBlock x:Name="TimerText" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <ProgressBar x:Name="TimerBar" Height="4" Maximum="100" Margin="0,8,0,0" />
+                <TextBlock x:Name="TimerHint" Text="keep holding push-to-talk" Foreground="#B3FFFFFF" FontSize="11"
+                           HorizontalAlignment="Center" Margin="0,5,0,0" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
